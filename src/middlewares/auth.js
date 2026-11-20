@@ -35,3 +35,16 @@ exports.protect = async (req, res, next) => {
   req.user = user;
   next();
 };
+
+// restrictTo: allows only the given roles. ALWAYS use it AFTER protect
+// (protect is what sets req.user).
+// Usage: router.post("/", protect, restrictTo("admin"), createProduct)
+exports.restrictTo =
+  (...roles) =>
+  (req, res, next) => {
+    if (!roles.includes(req.user.role)) {
+      // 401 = "who are you?"  403 = "I know you, but you are not allowed"
+      return res.status(403).json({ success: false, message: "You do not have permission" });
+    }
+    next();
+  };

@@ -5,7 +5,8 @@
   "license": "MIT",
   "scripts": {
     "start": "node --env-file=.env src/server.js",
-    "dev": "node --watch --env-file=.env src/server.js"
+    "dev": "node --watch --env-file=.env src/server.js",
+    "make-admin": "node --env-file=.env scripts/makeAdmin.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

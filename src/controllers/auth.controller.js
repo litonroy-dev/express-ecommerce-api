@@ -2,17 +2,7 @@ const bcrypt = require("bcryptjs");
 const User = require("../models/User");
 const { registerSchema, loginSchema } = require("../validators/auth.validator");
 const { signToken, cookieOptions } = require("../utils/token");
-
-// Helper: sends a 400 response with a readable list of validation errors.
-const sendValidationError = (res, zodError) =>
-  res.status(400).json({
-    success: false,
-    message: "Validation failed",
-    errors: zodError.issues.map((issue) => ({
-      field: issue.path.join("."),
-      message: issue.message,
-    })),
-  });
+const sendValidationError = require("../utils/sendValidationError");
 
 // Helper: the user data that is safe to send to the client (no password!)
 const publicUser = (user) => ({
