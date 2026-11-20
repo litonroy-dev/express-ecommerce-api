@@ -1,4 +1,9 @@
 const mongoose = require("mongoose");
+const checkEnv = require("./config/checkEnv");
+
+// Check .env BEFORE anything else starts
+checkEnv();
+
 const app = require("./app");
 
 const PORT = process.env.PORT || 5000;

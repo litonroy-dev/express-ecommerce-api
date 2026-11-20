@@ -6,7 +6,12 @@ const { z } = require("zod");
 const registerSchema = z.object({
   name: z.string().trim().min(2, "Name must be at least 2 characters"),
   email: z.string().trim().toLowerCase().email("Invalid email address"),
-  password: z.string().min(8, "Password must be at least 8 characters"),
+  // max 72: bcrypt only uses the first 72 bytes anyway, and a huge password
+  // would make the server waste time hashing it.
+  password: z
+    .string()
+    .min(8, "Password must be at least 8 characters")
+    .max(72, "Password must be at most 72 characters"),
 });
 
 // Rules for the login request body.

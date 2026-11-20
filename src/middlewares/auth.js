@@ -20,7 +20,9 @@ exports.protect = async (req, res, next) => {
   // Step 2: verify the token (checks the signature and the expiry date)
   let decoded;
   try {
-    decoded = jwt.verify(token, process.env.JWT_SECRET);
+    // algorithms: only accept HS256. Without this, a forged token that claims
+    // a different algorithm could be accepted in some libraries.
+    decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ["HS256"] });
   } catch {
     return res.status(401).json({ success: false, message: "Invalid or expired token" });
   }

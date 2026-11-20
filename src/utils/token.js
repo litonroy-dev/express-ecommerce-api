@@ -4,6 +4,7 @@ const jwt = require("jsonwebtoken");
 // Only our server knows JWT_SECRET, so nobody else can create a valid token.
 exports.signToken = (userId) =>
   jwt.sign({ id: userId }, process.env.JWT_SECRET, {
+    algorithm: "HS256", // say it explicitly instead of trusting defaults
     expiresIn: process.env.JWT_EXPIRES_IN,
   });
 

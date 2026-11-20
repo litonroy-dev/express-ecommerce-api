@@ -1,12 +1,13 @@
 const router = require("express").Router();
 const { register, login, logout, getMe } = require("../controllers/auth.controller");
 const { protect } = require("../middlewares/auth");
+const { loginLimiter, registerLimiter } = require("../middlewares/rateLimiters");
 
-// POST /api/auth/register
-router.post("/register", register);
+// POST /api/auth/register  (limiter runs first, then the controller)
+router.post("/register", registerLimiter, register);
 
 // POST /api/auth/login
-router.post("/login", login);
+router.post("/login", loginLimiter, login);
 
 // POST /api/auth/logout
 router.post("/logout", logout);
