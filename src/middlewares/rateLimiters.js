@@ -30,6 +30,13 @@ exports.loginLimiter = createLimiter({
   message: "Too many login attempts, please try again in 15 minutes",
 });
 
+// Coupon check: 20 tries per 15 minutes, so nobody can guess coupon codes
+exports.couponLimiter = createLimiter({
+  windowMs: 15 * 60 * 1000,
+  limit: 20,
+  message: "Too many coupon attempts, please try again later",
+});
+
 // Register: 5 accounts per hour per IP stops bots from creating fake accounts
 exports.registerLimiter = createLimiter({
   windowMs: 60 * 60 * 1000, // 1 hour

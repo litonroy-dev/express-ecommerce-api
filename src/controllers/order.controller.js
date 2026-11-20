@@ -2,6 +2,7 @@ const crypto = require("crypto");
 const Order = require("../models/Order");
 const Cart = require("../models/Cart");
 const Product = require("../models/Product");
+const Coupon = require("../models/Coupon");
 const {
   createOrderSchema,
   updateStatusSchema,
@@ -10,12 +11,13 @@ const {
 const sendValidationError = require("../utils/sendValidationError");
 const { isVisibleToCustomers } = require("../utils/productVisibility");
 const { round2, quantityError } = require("../utils/quantity");
+const { STATUS_FLOW, CUSTOMER_CANCELLABLE } = require("../constants/order");
 const {
-  STATUS_FLOW,
-  CUSTOMER_CANCELLABLE,
-  SHIPPING_FEE,
-  FREE_SHIPPING_OVER,
-} = require("../constants/order");
+  getCouponError,
+  calculateDiscount,
+  calculateTotals,
+  releaseCoupon,
+} = require("../utils/coupon");
 
 // "ORD-20261120-4F2A9C": date + 6 random hex characters
 const makeOrderNumber = () => {
@@ -94,10 +96,22 @@ exports.createOrder = async (req, res) => {
     });
   }
 
-  // Step 4: money
+  // Step 4: coupon (optional) and money
   const subtotal = round2(orderItems.reduce((sum, item) => sum + item.lineTotal, 0));
-  const shippingFee = subtotal >= FREE_SHIPPING_OVER ? 0 : SHIPPING_FEE;
-  const total = round2(subtotal + shippingFee);
+
+  let coupon = null;
+  let discount = 0;
+  if (result.data.couponCode) {
+    coupon = await Coupon.findOne({ code: result.data.couponCode });
+    const couponProblem = await getCouponError(coupon, subtotal, req.user._id);
+    if (couponProblem) {
+      return res.status(400).json({ success: false, message: couponProblem });
+    }
+    discount = calculateDiscount(coupon, subtotal);
+  }
+
+  // subtotal - discount + shipping fee (the same math as the coupon preview)
+  const { shippingFee, total } = calculateTotals(subtotal, discount);
 
   // Step 5: reduce the stock.
   // The filter { stock: { $gte: quantity } } and the $inc happen as ONE atomic operation.
@@ -120,6 +134,29 @@ exports.createOrder = async (req, res) => {
     reserved.push(item);
   }
 
+  // Step 5b: use up one redemption of the coupon.
+  // Like the stock, this is ONE atomic operation: the check "usageCount < usageLimit"
+  // and the +1 happen together, so the last redemption can't be used by two customers.
+  if (coupon) {
+    const claimed = await Coupon.updateOne(
+      {
+        _id: coupon._id,
+        isActive: true,
+        // usageLimit null = unlimited, otherwise usageCount must still be below it
+        $or: [{ usageLimit: null }, { $expr: { $lt: ["$usageCount", "$usageLimit"] } }],
+      },
+      { $inc: { usageCount: 1 } }
+    );
+
+    if (claimed.modifiedCount === 0) {
+      await restockItems(reserved); // undo the stock we already took
+      return res.status(409).json({
+        success: false,
+        message: "Sorry, this coupon was just fully used. Please try again without it.",
+      });
+    }
+  }
+
   // Step 6: save the order. If saving fails, give the stock back.
   let order;
   try {
@@ -131,11 +168,14 @@ exports.createOrder = async (req, res) => {
       paymentMethod: result.data.paymentMethod,
       note: result.data.note,
       subtotal,
+      couponCode: coupon?.code,
+      discount,
       shippingFee,
       total,
     });
   } catch (err) {
     await restockItems(reserved);
+    await releaseCoupon(coupon?.code); // give the coupon use back too
     throw err; // app.js error handler sends the 500
   }
 
@@ -221,6 +261,7 @@ exports.cancelOrder = async (req, res) => {
   }
 
   await restockItems(order.items);
+  await releaseCoupon(order.couponCode); // the customer may use the coupon again
   res.json({ success: true, order });
 };
 
@@ -260,7 +301,10 @@ exports.updateOrderStatus = async (req, res) => {
   }
 
   // Admin cancelled it, so the items go back on the shelf
-  if (newStatus === "cancelled") await restockItems(updated.items);
+  if (newStatus === "cancelled") {
+    await restockItems(updated.items);
+    await releaseCoupon(updated.couponCode);
+  }
 
   res.json({ success: true, order: updated });
 };

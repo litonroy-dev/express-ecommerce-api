@@ -16,6 +16,8 @@ const shippingAddressSchema = z.object({
 const createOrderSchema = z.object({
   shippingAddress: shippingAddressSchema,
   paymentMethod: z.enum(PAYMENT_METHODS).default("cod"),
+  // Optional coupon. The server calculates the discount, the client never sends an amount.
+  couponCode: z.string().trim().toUpperCase().optional(),
   note: z.string().trim().max(300, "Note can be at most 300 characters").optional(),
 });
 

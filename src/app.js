@@ -10,6 +10,8 @@ const categoryRoutes = require("./routes/category.routes");
 const cartRoutes = require("./routes/cart.routes");
 const orderRoutes = require("./routes/order.routes");
 const wishlistRoutes = require("./routes/wishlist.routes");
+const adminRoutes = require("./routes/admin.routes");
+const couponRoutes = require("./routes/coupon.routes");
 
 const app = express();
 
@@ -67,6 +69,12 @@ app.use("/api/orders", orderRoutes);
 
 // Every route in wishlist.routes.js starts with /api/wishlist
 app.use("/api/wishlist", wishlistRoutes);
+
+// Every route in admin.routes.js starts with /api/admin (admins only)
+app.use("/api/admin", adminRoutes);
+
+// Every route in coupon.routes.js starts with /api/coupons
+app.use("/api/coupons", couponRoutes);
 
 // Unknown URL -> JSON 404 (Express would send an HTML page by default)
 app.use((req, res) => {

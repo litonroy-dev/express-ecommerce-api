@@ -44,8 +44,11 @@ const orderSchema = new mongoose.Schema(
 
     // ---- Money ----
     subtotal: { type: Number, required: true }, // sum of lineTotals
+    // The coupon code that was used (copied, like the items) and the money it saved
+    couponCode: { type: String },
+    discount: { type: Number, default: 0 },
     shippingFee: { type: Number, required: true },
-    total: { type: Number, required: true }, // subtotal + shippingFee
+    total: { type: Number, required: true }, // subtotal - discount + shippingFee
 
     paymentMethod: { type: String, enum: PAYMENT_METHODS, default: "cod" },
     paymentStatus: { type: String, enum: ["pending", "paid"], default: "pending" },
@@ -58,5 +61,6 @@ const orderSchema = new mongoose.Schema(
 // "Show MY orders, newest first" is the most common query, so index it.
 orderSchema.index({ user: 1, createdAt: -1 });
 orderSchema.index({ status: 1, createdAt: -1 }); // admin: filter by status
+orderSchema.index({ user: 1, couponCode: 1 }); // "how many times did this user use this coupon?"
 
 module.exports = mongoose.model("Order", orderSchema);

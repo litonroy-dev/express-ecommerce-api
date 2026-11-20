@@ -7,10 +7,8 @@ const {
 } = require("../validators/product.validator");
 const sendValidationError = require("../utils/sendValidationError");
 const { uniqueSlug } = require("../utils/slug");
+const escapeRegex = require("../utils/escapeRegex");
 const { visibleToCustomers } = require("../utils/productVisibility");
-
-// Escape special regex characters so user input like "a+b(" can't break the search.
-const escapeRegex = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 // Which category fields we send inside a product (instead of just an id)
 const CATEGORY_FIELDS = "name slug";
