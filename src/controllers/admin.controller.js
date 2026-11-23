@@ -5,6 +5,7 @@ const User = require("../models/User");
 const {
   adminProductsQuerySchema,
   adminUsersQuerySchema,
+  updateUserSchema,
 } = require("../validators/admin.validator");
 const sendValidationError = require("../utils/sendValidationError");
 const escapeRegex = require("../utils/escapeRegex");
@@ -153,10 +154,13 @@ exports.listProducts = async (req, res) => {
 exports.listUsers = async (req, res) => {
   const result = adminUsersQuerySchema.safeParse(req.query);
   if (!result.success) return sendValidationError(res, result.error);
-  const { page, limit, search, role } = result.data;
+  const { page, limit, search, role, isActive } = result.data;
 
   const filter = {};
   if (role) filter.role = role;
+  // old users have no isActive field, so "active" means "not explicitly false"
+  if (isActive === true) filter.isActive = { $ne: false };
+  if (isActive === false) filter.isActive = false;
   if (search) {
     const regex = { $regex: escapeRegex(search), $options: "i" };
     filter.$or = [{ name: regex }, { email: regex }];
@@ -165,7 +169,7 @@ exports.listUsers = async (req, res) => {
   const [users, total] = await Promise.all([
     // select = send ONLY these fields. The password hash must never leave the server.
     User.find(filter)
-      .select("name email role createdAt")
+      .select("name email phone role isActive createdAt")
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(limit),
@@ -173,4 +177,71 @@ exports.listUsers = async (req, res) => {
   ]);
 
   res.json({ success: true, users, pagination: paginationInfo(page, limit, total) });
+};
+
+// Same safe fields everywhere an admin sees a user (never the password hash)
+const USER_FIELDS = "name email phone role isActive createdAt updatedAt";
+
+// GET /api/admin/users/:id
+// The user plus a small summary of their orders (cancelled orders are not counted).
+exports.getUser = async (req, res) => {
+  const user = await User.findById(req.params.id).select(USER_FIELDS);
+  if (!user) return res.status(404).json({ success: false, message: "User not found" });
+
+  const [stats, recentOrders] = await Promise.all([
+    Order.aggregate([
+      { $match: { user: user._id, status: { $ne: "cancelled" } } },
+      { $group: { _id: null, orders: { $sum: 1 }, totalSpent: { $sum: "$total" } } },
+    ]),
+    Order.find({ user: user._id })
+      .sort({ createdAt: -1 })
+      .limit(5)
+      .select("orderNumber status paymentStatus total createdAt"),
+  ]);
+
+  res.json({
+    success: true,
+    user,
+    stats: { orders: stats[0]?.orders ?? 0, totalSpent: round2(stats[0]?.totalSpent ?? 0) },
+    recentOrders,
+  });
+};
+
+// PATCH /api/admin/users/:id   body: { role?, isActive? }
+exports.updateUser = async (req, res) => {
+  const result = updateUserSchema.safeParse(req.body);
+  if (!result.success) return sendValidationError(res, result.error);
+
+  // An admin can't demote or block THEMSELVES, or the shop could end up with no admin.
+  if (String(req.params.id) === String(req.user._id)) {
+    return res
+      .status(400)
+      .json({ success: false, message: "You can't change your own role or block yourself" });
+  }
+
+  const user = await User.findByIdAndUpdate(req.params.id, result.data, {
+    new: true,
+    runValidators: true,
+  }).select(USER_FIELDS);
+  if (!user) return res.status(404).json({ success: false, message: "User not found" });
+
+  res.json({ success: true, message: "User updated", user });
+};
+
+// GET /api/admin/products/:id
+// Unlike the public one, this also returns hidden (inactive) products.
+exports.getProduct = async (req, res) => {
+  const product = await Product.findById(req.params.id).populate("category", "name slug");
+  if (!product) return res.status(404).json({ success: false, message: "Product not found" });
+
+  res.json({ success: true, product });
+};
+
+// GET /api/admin/orders/:id
+// Full order plus who ordered it.
+exports.getOrder = async (req, res) => {
+  const order = await Order.findById(req.params.id).populate("user", "name email phone");
+  if (!order) return res.status(404).json({ success: false, message: "Order not found" });
+
+  res.json({ success: true, order });
 };

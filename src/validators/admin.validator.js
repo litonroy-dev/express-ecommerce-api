@@ -24,6 +24,17 @@ const adminUsersQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
   search: z.string().trim().optional(), // matches name OR email
   role: z.enum(["user", "admin"]).optional(),
+  isActive: booleanString.optional(), // false = show only blocked users
 });
 
-module.exports = { adminProductsQuerySchema, adminUsersQuerySchema };
+// Body of PATCH /api/admin/users/:id  (send one or both)
+const updateUserSchema = z
+  .object({
+    role: z.enum(["user", "admin"]),
+    isActive: z.boolean(),
+  })
+  .partial()
+  .strict()
+  .refine((d) => Object.keys(d).length > 0, { message: "Nothing to update" });
+
+module.exports = { adminProductsQuerySchema, adminUsersQuerySchema, updateUserSchema };

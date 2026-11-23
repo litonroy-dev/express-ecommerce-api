@@ -33,6 +33,11 @@ exports.protect = async (req, res, next) => {
     return res.status(401).json({ success: false, message: "User no longer exists" });
   }
 
+  // Step 3a: blocked by an admin
+  if (user.isActive === false) {
+    return res.status(403).json({ success: false, message: "Your account has been blocked" });
+  }
+
   // Step 3b: if the password was changed (reset) AFTER this token was issued,
   // the token is old and must not work any more. (iat is in seconds)
   if (

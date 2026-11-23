@@ -167,6 +167,10 @@ exports.login = async (req, res) => {
     return res.status(401).json({ success: false, message: "Invalid email or password" });
   }
 
+  if (user.isActive === false) {
+    return res.status(403).json({ success: false, message: "Your account has been blocked" });
+  }
+
   // Step 4: create a JWT and put it in an httpOnly cookie
   const token = signToken(user._id);
   res.cookie("token", token, cookieOptions);

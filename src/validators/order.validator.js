@@ -23,6 +23,11 @@ const createOrderSchema = z
     path: ["shippingAddress"],
   });
 
+// Body of POST /api/orders/preview  (checkout page: "what will I pay?")
+const previewOrderSchema = z.object({
+  couponCode: z.string().trim().toUpperCase().optional(),
+});
+
 // Body of PATCH /api/orders/:id/status  (admin)
 const updateStatusSchema = z.object({
   status: z.enum(ORDER_STATUSES, `Status must be one of: ${ORDER_STATUSES.join(", ")}`),
@@ -35,4 +40,4 @@ const listOrdersSchema = z.object({
   status: z.enum(ORDER_STATUSES).optional(),
 });
 
-module.exports = { createOrderSchema, updateStatusSchema, listOrdersSchema };
+module.exports = { createOrderSchema, previewOrderSchema, updateStatusSchema, listOrdersSchema };

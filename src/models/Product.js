@@ -46,6 +46,10 @@ const productSchema = new mongoose.Schema(
 
     images: { type: [String], default: [] },
 
+    // ---- Reviews (kept up to date by review.controller.js) ----
+    ratingAverage: { type: Number, default: 0, min: 0, max: 5 }, // e.g. 4.3
+    ratingCount: { type: Number, default: 0, min: 0 },
+
     // false = hidden from customers (like a soft delete) without losing the data
     isActive: { type: Boolean, default: true },
 

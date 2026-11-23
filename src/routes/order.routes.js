@@ -1,6 +1,7 @@
 const router = require("express").Router();
 const {
   createOrder,
+  previewOrder,
   listMyOrders,
   listAllOrders,
   getOrder,
@@ -14,6 +15,7 @@ const validateObjectId = require("../middlewares/validateObjectId");
 router.use(protect);
 
 // Customer
+router.post("/preview", previewOrder);
 router.post("/", createOrder);
 router.get("/", listMyOrders);
 

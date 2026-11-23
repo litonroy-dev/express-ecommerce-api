@@ -9,11 +9,21 @@ const {
 const { protect, restrictTo } = require("../middlewares/auth");
 const validateObjectId = require("../middlewares/validateObjectId");
 const uploadImagesMiddleware = require("../middlewares/uploadImages");
+const {
+  listProductReviews,
+  getMyReview,
+  createReview,
+} = require("../controllers/review.controller");
 const { uploadImages, deleteImage } = require("../controllers/productImage.controller");
 
 // Public: anyone can browse products
 router.get("/", listProducts);
 router.get("/:id", validateObjectId, getProduct);
+
+// Reviews: anyone can read, only logged-in buyers can write
+router.get("/:id/reviews", validateObjectId, listProductReviews);
+router.get("/:id/reviews/me", protect, validateObjectId, getMyReview);
+router.post("/:id/reviews", protect, validateObjectId, createReview);
 
 // Admin only. Order matters:
 // protect (who are you?) -> restrictTo (are you admin?) -> validateObjectId -> handler

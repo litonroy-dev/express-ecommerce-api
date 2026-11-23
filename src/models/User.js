@@ -14,6 +14,10 @@ const userSchema = new mongoose.Schema(
     // The stored value is a bcrypt HASH, never the real password
     password: { type: String, required: true },
     role: { type: String, enum: ["user", "admin"], default: "user" },
+    // false = blocked by an admin: can't log in and existing tokens stop working.
+    // (Users created before this field existed have none, so we treat only an
+    // explicit false as blocked.)
+    isActive: { type: Boolean, default: true },
     phone: { type: String, trim: true }, // optional, set from the profile page
 
     // ---- Forgot password ----

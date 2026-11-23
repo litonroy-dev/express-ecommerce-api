@@ -6,13 +6,14 @@ const Coupon = require("../models/Coupon");
 const Address = require("../models/Address");
 const {
   createOrderSchema,
+  previewOrderSchema,
   updateStatusSchema,
   listOrdersSchema,
 } = require("../validators/order.validator");
 const sendValidationError = require("../utils/sendValidationError");
 const { isVisibleToCustomers } = require("../utils/productVisibility");
 const { round2, quantityError } = require("../utils/quantity");
-const { STATUS_FLOW, CUSTOMER_CANCELLABLE } = require("../constants/order");
+const { STATUS_FLOW, CUSTOMER_CANCELLABLE, SHIPPING_FEE, FREE_SHIPPING_OVER } = require("../constants/order");
 const {
   getCouponError,
   calculateDiscount,
@@ -197,6 +198,77 @@ exports.createOrder = async (req, res) => {
   await cart.save();
 
   res.status(201).json({ success: true, order });
+};
+
+// POST /api/orders/preview   body: { couponCode? }
+// Shows what checkout WOULD charge, without touching stock, coupons or the cart.
+// Uses the same rules and money math as createOrder, so the numbers always match.
+// Problems are returned inside the response (not as errors), so the checkout page can
+// still show the totals and tell the customer what to fix.
+exports.previewOrder = async (req, res) => {
+  const result = previewOrderSchema.safeParse(req.body);
+  if (!result.success) return sendValidationError(res, result.error);
+
+  const cart = await Cart.findOne({ user: req.user._id });
+  if (!cart || cart.items.length === 0) {
+    return res.status(400).json({ success: false, message: "Your cart is empty" });
+  }
+
+  const products = await Product.find({ _id: { $in: cart.items.map((i) => i.product) } });
+  const productById = new Map(products.map((p) => [p._id.toString(), p]));
+
+  const problems = [];
+  const items = [];
+  for (const item of cart.items) {
+    const product = productById.get(item.product.toString());
+    if (!product || !isVisibleToCustomers(product)) {
+      problems.push({ productId: item.product, message: "This product is no longer available" });
+      continue;
+    }
+    const error = quantityError(product, item.quantity);
+    if (error) {
+      problems.push({ productId: product._id, name: product.name, message: error });
+      continue;
+    }
+    items.push({
+      product: product._id,
+      name: product.name,
+      slug: product.slug,
+      image: product.images[0],
+      unit: product.unit,
+      unitSize: product.unitSize,
+      price: product.price,
+      quantity: item.quantity,
+      lineTotal: round2(product.price * item.quantity),
+    });
+  }
+
+  const subtotal = round2(items.reduce((sum, i) => sum + i.lineTotal, 0));
+
+  let discount = 0;
+  let couponError = null;
+  if (result.data.couponCode) {
+    const coupon = await Coupon.findOne({ code: result.data.couponCode });
+    couponError = await getCouponError(coupon, subtotal, req.user._id);
+    if (!couponError) discount = calculateDiscount(coupon, subtotal);
+  }
+
+  const totals = calculateTotals(subtotal, discount);
+
+  res.json({
+    success: true,
+    preview: {
+      items,
+      ...totals, // subtotal, discount, shippingFee, total
+      couponCode: result.data.couponCode && !couponError ? result.data.couponCode : null,
+      couponError,
+      // so the page can show "Add 250 more for free delivery"
+      freeShippingOver: FREE_SHIPPING_OVER,
+      standardShippingFee: SHIPPING_FEE,
+      problems,
+      canCheckout: items.length > 0 && problems.length === 0,
+    },
+  });
 };
 
 // GET /api/orders   (my orders)
