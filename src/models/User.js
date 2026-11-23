@@ -14,6 +14,7 @@ const userSchema = new mongoose.Schema(
     // The stored value is a bcrypt HASH, never the real password
     password: { type: String, required: true },
     role: { type: String, enum: ["user", "admin"], default: "user" },
+    phone: { type: String, trim: true }, // optional, set from the profile page
 
     // ---- Forgot password ----
     // We store only a HASH of the reset token (like a password), so even someone who

@@ -6,6 +6,8 @@ const {
   getMe,
   forgotPassword,
   resetPassword,
+  updateMe,
+  changePassword,
 } = require("../controllers/auth.controller");
 const { protect } = require("../middlewares/auth");
 const {
@@ -13,6 +15,7 @@ const {
   registerLimiter,
   forgotPasswordLimiter,
   resetPasswordLimiter,
+  changePasswordLimiter,
 } = require("../middlewares/rateLimiters");
 
 // POST /api/auth/register  (limiter runs first, then the controller)
@@ -32,5 +35,11 @@ router.post("/logout", logout);
 
 // GET /api/auth/me (protect runs first; if not logged in, getMe never runs)
 router.get("/me", protect, getMe);
+
+// PATCH /api/auth/me  (update name / phone)
+router.patch("/me", protect, updateMe);
+
+// PATCH /api/auth/change-password  (needs the current password)
+router.patch("/change-password", protect, changePasswordLimiter, changePassword);
 
 module.exports = router;

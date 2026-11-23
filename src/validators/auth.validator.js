@@ -33,4 +33,35 @@ const resetPasswordSchema = z.object({
   password: registerSchema.shape.password,
 });
 
-module.exports = { registerSchema, loginSchema, forgotPasswordSchema, resetPasswordSchema };
+// Body of PATCH /api/auth/me  (only the fields the user may change; email and role are NOT here)
+const updateProfileSchema = z
+  .object({
+    name: registerSchema.shape.name,
+    // same phone rule as addresses; empty string or null clears the phone
+    phone: z
+      .union([z.string().trim().regex(/^\+?\d{10,15}$/, "Invalid phone number"), z.literal(""), z.null()])
+      .transform((v) => v || null),
+  })
+  .partial()
+  .strict()
+  .refine((d) => Object.keys(d).length > 0, { message: "Nothing to update" });
+
+// Body of PATCH /api/auth/change-password
+const changePasswordSchema = z
+  .object({
+    currentPassword: z.string().min(1, "Current password is required").max(72),
+    newPassword: registerSchema.shape.password,
+  })
+  .refine((d) => d.currentPassword !== d.newPassword, {
+    message: "New password must be different from the current password",
+    path: ["newPassword"],
+  });
+
+module.exports = {
+  registerSchema,
+  loginSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
+  updateProfileSchema,
+  changePasswordSchema,
+};

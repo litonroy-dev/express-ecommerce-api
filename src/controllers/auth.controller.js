@@ -6,6 +6,8 @@ const {
   loginSchema,
   forgotPasswordSchema,
   resetPasswordSchema,
+  updateProfileSchema,
+  changePasswordSchema,
 } = require("../validators/auth.validator");
 const { sendEmail } = require("../utils/email");
 const { signToken, cookieOptions } = require("../utils/token");
@@ -17,6 +19,7 @@ const publicUser = (user) => ({
   name: user.name,
   email: user.email,
   role: user.role,
+  phone: user.phone || null,
 });
 
 // POST /api/auth/register
@@ -176,4 +179,43 @@ exports.login = async (req, res) => {
     token,
     user: publicUser(user),
   });
+};
+
+// PATCH /api/auth/me   body: { name?, phone? }
+// Email and role can't be changed here (the schema is strict, unknown fields are rejected).
+exports.updateMe = async (req, res) => {
+  const result = updateProfileSchema.safeParse(req.body);
+  if (!result.success) return sendValidationError(res, result.error);
+
+  const user = await User.findByIdAndUpdate(req.user._id, result.data, {
+    new: true,
+    runValidators: true,
+  });
+
+  res.json({ success: true, message: "Profile updated", user: publicUser(user) });
+};
+
+// PATCH /api/auth/change-password   body: { currentPassword, newPassword }
+exports.changePassword = async (req, res) => {
+  const result = changePasswordSchema.safeParse(req.body);
+  if (!result.success) return sendValidationError(res, result.error);
+  const { currentPassword, newPassword } = result.data;
+
+  const ok = await bcrypt.compare(currentPassword, req.user.password);
+  if (!ok) {
+    return res.status(400).json({ success: false, message: "Current password is incorrect" });
+  }
+
+  const hashed = await bcrypt.hash(newPassword, 10);
+  // passwordChangedAt logs out every OTHER device (old tokens are rejected by protect).
+  // Also cancel any pending reset link.
+  await User.findByIdAndUpdate(req.user._id, {
+    $set: { password: hashed, passwordChangedAt: new Date() },
+    $unset: { passwordResetToken: 1, passwordResetExpires: 1 },
+  });
+
+  // Give THIS device a fresh token so the user stays logged in here.
+  const token = signToken(req.user._id);
+  res.cookie("token", token, cookieOptions);
+  res.json({ success: true, message: "Password changed successfully", token });
 };

@@ -51,6 +51,14 @@ exports.resetPasswordLimiter = createLimiter({
   message: "Too many attempts, please try again later",
 });
 
+// Change password: only wrong current-password guesses count
+exports.changePasswordLimiter = createLimiter({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  skipSuccessfulRequests: true,
+  message: "Too many attempts, please try again later",
+});
+
 // Register: 5 accounts per hour per IP stops bots from creating fake accounts
 exports.registerLimiter = createLimiter({
   windowMs: 60 * 60 * 1000, // 1 hour
