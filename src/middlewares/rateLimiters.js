@@ -37,6 +37,20 @@ exports.couponLimiter = createLimiter({
   message: "Too many coupon attempts, please try again later",
 });
 
+// Forgot password: 5 emails per hour per IP, so nobody can spam someone's inbox
+exports.forgotPasswordLimiter = createLimiter({
+  windowMs: 60 * 60 * 1000,
+  limit: 5,
+  message: "Too many password reset requests, please try again later",
+});
+
+// Reset password: 10 tries per 15 minutes
+exports.resetPasswordLimiter = createLimiter({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  message: "Too many attempts, please try again later",
+});
+
 // Register: 5 accounts per hour per IP stops bots from creating fake accounts
 exports.registerLimiter = createLimiter({
   windowMs: 60 * 60 * 1000, // 1 hour

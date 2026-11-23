@@ -1,25 +1,27 @@
 const { z } = require("zod");
 const { ORDER_STATUSES, PAYMENT_METHODS } = require("../constants/order");
+const { addressFields } = require("./address.validator");
+const { objectId } = require("./common");
 
-const shippingAddressSchema = z.object({
-  fullName: z.string().trim().min(2, "Full name is required"),
-  // Optional "+" then 10-15 digits, e.g. 01712345678 or +8801712345678
-  phone: z.string().trim().regex(/^\+?\d{10,15}$/, "Invalid phone number"),
-  address: z.string().trim().min(5, "Address is too short"),
-  city: z.string().trim().min(2, "City is required"),
-  area: z.string().trim().optional(),
-  postalCode: z.string().trim().optional(),
-});
+const shippingAddressSchema = z.object(addressFields);
 
 // Body of POST /api/orders
 // Notice: NO items, NO prices. The server takes them from the cart and the products.
-const createOrderSchema = z.object({
-  shippingAddress: shippingAddressSchema,
-  paymentMethod: z.enum(PAYMENT_METHODS).default("cod"),
-  // Optional coupon. The server calculates the discount, the client never sends an amount.
-  couponCode: z.string().trim().toUpperCase().optional(),
-  note: z.string().trim().max(300, "Note can be at most 300 characters").optional(),
-});
+// The delivery address is EITHER typed in (shippingAddress) OR picked from the
+// address book (addressId), not both.
+const createOrderSchema = z
+  .object({
+    shippingAddress: shippingAddressSchema.optional(),
+    addressId: objectId.optional(),
+    paymentMethod: z.enum(PAYMENT_METHODS).default("cod"),
+    // Optional coupon. The server calculates the discount, the client never sends an amount.
+    couponCode: z.string().trim().toUpperCase().optional(),
+    note: z.string().trim().max(300, "Note can be at most 300 characters").optional(),
+  })
+  .refine((data) => Boolean(data.shippingAddress) !== Boolean(data.addressId), {
+    message: "Send either shippingAddress or addressId (not both)",
+    path: ["shippingAddress"],
+  });
 
 // Body of PATCH /api/orders/:id/status  (admin)
 const updateStatusSchema = z.object({

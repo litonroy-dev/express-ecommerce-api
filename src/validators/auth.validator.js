@@ -21,4 +21,16 @@ const loginSchema = z.object({
   password: z.string().min(1, "Password is required"),
 });
 
-module.exports = { registerSchema, loginSchema };
+// Body of POST /api/auth/forgot-password
+const forgotPasswordSchema = z.object({
+  email: z.string().trim().toLowerCase().email("Invalid email address"),
+});
+
+// Body of POST /api/auth/reset-password
+const resetPasswordSchema = z.object({
+  token: z.string().trim().min(1, "Token is required").max(200),
+  // same password rules as register
+  password: registerSchema.shape.password,
+});
+
+module.exports = { registerSchema, loginSchema, forgotPasswordSchema, resetPasswordSchema };

@@ -17,6 +17,12 @@ module.exports = function checkEnv() {
     errors.push("CLIENT_URL is required in production (it is used for CORS)");
   }
 
+  // Without SMTP, reset emails are only printed in the terminal: fine for development,
+  // but in production customers would never receive them.
+  if (process.env.NODE_ENV === "production" && !process.env.SMTP_HOST) {
+    errors.push("SMTP_HOST (and SMTP_USER, SMTP_PASS, EMAIL_FROM) are required in production");
+  }
+
   if (errors.length > 0) {
     console.error("Environment problems:\n - " + errors.join("\n - "));
     process.exit(1);

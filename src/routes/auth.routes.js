@@ -1,13 +1,31 @@
 const router = require("express").Router();
-const { register, login, logout, getMe } = require("../controllers/auth.controller");
+const {
+  register,
+  login,
+  logout,
+  getMe,
+  forgotPassword,
+  resetPassword,
+} = require("../controllers/auth.controller");
 const { protect } = require("../middlewares/auth");
-const { loginLimiter, registerLimiter } = require("../middlewares/rateLimiters");
+const {
+  loginLimiter,
+  registerLimiter,
+  forgotPasswordLimiter,
+  resetPasswordLimiter,
+} = require("../middlewares/rateLimiters");
 
 // POST /api/auth/register  (limiter runs first, then the controller)
 router.post("/register", registerLimiter, register);
 
 // POST /api/auth/login
 router.post("/login", loginLimiter, login);
+
+// POST /api/auth/forgot-password  (sends a reset link by email)
+router.post("/forgot-password", forgotPasswordLimiter, forgotPassword);
+
+// POST /api/auth/reset-password  (sets the new password using the emailed token)
+router.post("/reset-password", resetPasswordLimiter, resetPassword);
 
 // POST /api/auth/logout
 router.post("/logout", logout);

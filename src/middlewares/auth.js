@@ -33,6 +33,15 @@ exports.protect = async (req, res, next) => {
     return res.status(401).json({ success: false, message: "User no longer exists" });
   }
 
+  // Step 3b: if the password was changed (reset) AFTER this token was issued,
+  // the token is old and must not work any more. (iat is in seconds)
+  if (
+    user.passwordChangedAt &&
+    decoded.iat < Math.floor(user.passwordChangedAt.getTime() / 1000)
+  ) {
+    return res.status(401).json({ success: false, message: "Password changed. Please log in again." });
+  }
+
   // Step 4: attach the user to the request so next handlers can use req.user
   req.user = user;
   next();

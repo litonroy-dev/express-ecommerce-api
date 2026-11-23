@@ -3,6 +3,7 @@ const Order = require("../models/Order");
 const Cart = require("../models/Cart");
 const Product = require("../models/Product");
 const Coupon = require("../models/Coupon");
+const Address = require("../models/Address");
 const {
   createOrderSchema,
   updateStatusSchema,
@@ -46,6 +47,18 @@ const paginationInfo = (page, limit, total) => ({
 exports.createOrder = async (req, res) => {
   const result = createOrderSchema.safeParse(req.body);
   if (!result.success) return sendValidationError(res, result.error);
+
+  // Step 0: where to deliver. Either typed in, or a saved address (must be MINE).
+  let shippingAddress = result.data.shippingAddress;
+  if (result.data.addressId) {
+    const saved = await Address.findOne({ _id: result.data.addressId, user: req.user._id });
+    if (!saved) {
+      return res.status(404).json({ success: false, message: "Address not found" });
+    }
+    // Copy the fields into the order (a snapshot, like the items)
+    const { fullName, phone, address, city, area, postalCode } = saved;
+    shippingAddress = { fullName, phone, address, city, area, postalCode };
+  }
 
   // Step 1: the order is made from the user's cart
   const cart = await Cart.findOne({ user: req.user._id });
@@ -164,7 +177,7 @@ exports.createOrder = async (req, res) => {
       orderNumber: makeOrderNumber(),
       user: req.user._id,
       items: orderItems,
-      shippingAddress: result.data.shippingAddress,
+      shippingAddress,
       paymentMethod: result.data.paymentMethod,
       note: result.data.note,
       subtotal,
