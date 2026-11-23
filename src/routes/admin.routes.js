@@ -14,6 +14,12 @@ const {
   updateCoupon,
   deleteCoupon,
 } = require("../controllers/coupon.controller");
+const {
+  listAllBanners,
+  createBanner,
+  updateBanner,
+  deleteBanner,
+} = require("../controllers/banner.controller");
 const { protect, restrictTo } = require("../middlewares/auth");
 const validateObjectId = require("../middlewares/validateObjectId");
 
@@ -33,6 +39,11 @@ router.get("/coupons", listCoupons);
 router.post("/coupons", createCoupon);
 router.patch("/coupons/:id", validateObjectId, updateCoupon);
 router.delete("/coupons/:id", validateObjectId, deleteCoupon);
+
+router.get("/banners", listAllBanners);
+router.post("/banners", createBanner);
+router.patch("/banners/:id", validateObjectId, updateBanner);
+router.delete("/banners/:id", validateObjectId, deleteBanner);
 
 // Order list/status admin routes: GET /api/orders/all and PATCH /api/orders/:id/status
 

@@ -32,6 +32,7 @@ const productFields = z.object({
 
   images: z.array(z.string().url("Each image must be a valid URL")).optional(),
   isActive: z.boolean().optional(),
+  isFeatured: z.boolean().optional(),
 });
 
 // Rule that involves TWO fields, so it goes in refine() instead of on one field.
@@ -56,9 +57,12 @@ const listProductsSchema = z.object({
   brand: z.string().trim().optional(),
   // "true" / "false" strings from the URL -> real booleans
   isOrganic: z.enum(["true", "false"]).transform((v) => v === "true").optional(),
+  // ?featured=true -> only featured products,  ?onSale=true -> only discounted products
+  featured: z.enum(["true", "false"]).transform((v) => v === "true").optional(),
+  onSale: z.enum(["true", "false"]).transform((v) => v === "true").optional(),
   minPrice: z.coerce.number().min(0).optional(),
   maxPrice: z.coerce.number().min(0).optional(),
-  sort: z.enum(["newest", "price_asc", "price_desc"]).default("newest"),
+  sort: z.enum(["newest", "price_asc", "price_desc", "rating"]).default("newest"),
 });
 
 module.exports = { createProductSchema, updateProductSchema, listProductsSchema };

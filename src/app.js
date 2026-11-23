@@ -14,6 +14,7 @@ const adminRoutes = require("./routes/admin.routes");
 const couponRoutes = require("./routes/coupon.routes");
 const addressRoutes = require("./routes/address.routes");
 const reviewRoutes = require("./routes/review.routes");
+const homeRoutes = require("./routes/home.routes");
 
 const app = express();
 
@@ -83,6 +84,9 @@ app.use("/api/addresses", addressRoutes);
 
 // Every route in review.routes.js starts with /api/reviews
 app.use("/api/reviews", reviewRoutes);
+
+// GET /api/home and GET /api/banners (public home page data)
+app.use("/api", homeRoutes);
 
 // Unknown URL -> JSON 404 (Express would send an HTML page by default)
 app.use((req, res) => {

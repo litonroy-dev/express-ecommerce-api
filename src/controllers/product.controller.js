@@ -42,8 +42,19 @@ exports.listProducts = async (req, res) => {
   const result = listProductsSchema.safeParse(req.query);
   if (!result.success) return sendValidationError(res, result.error);
 
-  const { page, limit, search, category, brand, isOrganic, minPrice, maxPrice, sort } =
-    result.data;
+  const {
+    page,
+    limit,
+    search,
+    category,
+    brand,
+    isOrganic,
+    featured,
+    onSale,
+    minPrice,
+    maxPrice,
+    sort,
+  } = result.data;
 
   // Step 1: build the MongoDB filter, starting with what customers may see.
   const filter = visibleToCustomers();
@@ -60,6 +71,8 @@ exports.listProducts = async (req, res) => {
   }
   if (brand) filter.brand = brand;
   if (isOrganic !== undefined) filter.isOrganic = isOrganic;
+  if (featured !== undefined) filter.isFeatured = featured;
+  if (onSale === true) filter.$expr = { $gt: ["$originalPrice", "$price"] };
 
   if (minPrice !== undefined || maxPrice !== undefined) {
     filter.price = {};
@@ -72,6 +85,7 @@ exports.listProducts = async (req, res) => {
     newest: { createdAt: -1 },
     price_asc: { price: 1 },
     price_desc: { price: -1 },
+    rating: { ratingAverage: -1, ratingCount: -1 }, // best rated first
   };
 
   // Step 3: pagination. Page 3 with limit 12 -> skip the first 24 products.

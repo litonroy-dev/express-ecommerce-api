@@ -50,6 +50,9 @@ const productSchema = new mongoose.Schema(
     ratingAverage: { type: Number, default: 0, min: 0, max: 5 }, // e.g. 4.3
     ratingCount: { type: Number, default: 0, min: 0 },
 
+    // true = shown in the "Featured" section of the home page (set by the admin)
+    isFeatured: { type: Boolean, default: false },
+
     // false = hidden from customers (like a soft delete) without losing the data
     isActive: { type: Boolean, default: true },
 
