@@ -1,10 +1,13 @@
 const crypto = require("crypto");
 const bcrypt = require("bcryptjs");
 const User = require("../models/User");
+const RegistrationOtp = require("../models/RegistrationOtp");
 const {
   registerSchema,
   loginSchema,
   forgotPasswordSchema,
+  verifyEmailSchema,
+  registrationEmailSchema,
   resetPasswordSchema,
   updateProfileSchema,
   changePasswordSchema,
@@ -28,7 +31,17 @@ exports.register = async (req, res) => {
   const result = registerSchema.safeParse(req.body);
   if (!result.success) return sendValidationError(res, result.error);
 
-  const { name, email, password } = result.data; // cleaned data
+  const { name, email, password, registrationToken } = result.data;
+
+  const proofHash = hashToken(registrationToken);
+  const proof = await RegistrationOtp.findOne({
+    email,
+    registrationTokenHash: proofHash,
+    registrationTokenExpiresAt: { $gt: new Date() },
+  }).select("+registrationTokenHash +registrationTokenExpiresAt");
+  if (!proof) {
+    return res.status(400).json({ success: false, message: "Verify your email before registering" });
+  }
 
   // Step 2: hash the password (10 = how much work bcrypt does; 10-12 is normal)
   const hashedPassword = await bcrypt.hash(password, 10);
@@ -36,13 +49,90 @@ exports.register = async (req, res) => {
   // Step 3: save the user
   // We don't read "role" from the request, so nobody can register as admin.
   // If the email already exists, MongoDB throws error 11000 and app.js handles it.
-  const user = await User.create({ name, email, password: hashedPassword });
+  const user = await User.create({
+    name,
+    email,
+    password: hashedPassword,
+  });
+  await RegistrationOtp.deleteOne({ _id: proof._id, registrationTokenHash: proofHash });
 
   // Step 4: respond WITHOUT the password
   res.status(201).json({
     success: true,
-    message: "Registered successfully",
+    message: "Registered successfully. You can now log in.",
     user: publicUser(user),
+  });
+};
+
+// POST /api/auth/registration-otp  body: { email }
+exports.sendRegistrationOtp = async (req, res) => {
+  const result = registrationEmailSchema.safeParse(req.body);
+  if (!result.success) return sendValidationError(res, result.error);
+  const { email } = result.data;
+  if (await User.exists({ email })) {
+    return res.status(409).json({ success: false, message: "An account with this email already exists" });
+  }
+
+  const otp = String(crypto.randomInt(100000, 1000000));
+  await RegistrationOtp.findOneAndUpdate(
+    { email },
+    {
+      $set: {
+        email,
+        otpHash: hashToken(otp),
+        otpExpiresAt: new Date(Date.now() + 10 * 60 * 1000),
+        attempts: 0,
+      },
+      $unset: { registrationTokenHash: 1, registrationTokenExpiresAt: 1 },
+    },
+    { upsert: true, new: true, setDefaultsOnInsert: true }
+  );
+  await sendEmail({
+    to: email,
+    subject: "Your registration verification code",
+    text: `Your email verification code is: ${otp}\nIt expires in 10 minutes.`,
+  });
+  res.json({ success: true, message: "Verification code sent to your email" });
+};
+
+// POST /api/auth/verify-email  body: { email, otp }
+exports.verifyEmail = async (req, res) => {
+  const result = verifyEmailSchema.safeParse(req.body);
+  if (!result.success) return sendValidationError(res, result.error);
+
+  const { email, otp } = result.data;
+  const invalid = () => res.status(400).json({ success: false, message: "OTP is invalid or has expired" });
+  const record = await RegistrationOtp.findOne({ email }).select(
+    "+otpHash +otpExpiresAt +attempts"
+  );
+  if (!record || !record.otpHash || !record.otpExpiresAt ||
+      record.otpExpiresAt <= new Date() || record.attempts >= 5) return invalid();
+
+  if (record.otpHash !== hashToken(otp)) {
+    await RegistrationOtp.findOneAndUpdate(
+      { _id: record._id, attempts: { $lt: 5 } },
+      { $inc: { attempts: 1 } }
+    );
+    return invalid();
+  }
+
+  const registrationToken = crypto.randomBytes(32).toString("hex");
+  const updated = await RegistrationOtp.findOneAndUpdate(
+    { _id: record._id, otpHash: record.otpHash, otpExpiresAt: { $gt: new Date() }, attempts: { $lt: 5 } },
+    {
+      $set: {
+        registrationTokenHash: hashToken(registrationToken),
+        registrationTokenExpiresAt: new Date(Date.now() + 15 * 60 * 1000),
+      },
+      $unset: { otpHash: 1, otpExpiresAt: 1, attempts: 1 },
+    },
+    { new: true }
+  );
+  if (!updated) return invalid();
+  res.json({
+    success: true,
+    message: "Email verified. Complete registration within 15 minutes.",
+    registrationToken,
   });
 };
 

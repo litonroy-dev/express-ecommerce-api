@@ -1,6 +1,8 @@
 const router = require("express").Router();
 const {
   register,
+  verifyEmail,
+  sendRegistrationOtp,
   login,
   logout,
   getMe,
@@ -20,6 +22,12 @@ const {
 
 // POST /api/auth/register  (limiter runs first, then the controller)
 router.post("/register", registerLimiter, register);
+
+// POST /api/auth/verify-email  body: { email } (sends the registration OTP)
+router.post("/verify-email", registerLimiter, sendRegistrationOtp);
+
+// POST /api/auth/registration-otp  body: { email, otp } (verifies the OTP)
+router.post("/registration-otp", registerLimiter, verifyEmail);
 
 // POST /api/auth/login
 router.post("/login", loginLimiter, login);

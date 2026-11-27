@@ -6,6 +6,7 @@ const { z } = require("zod");
 const registerSchema = z.object({
   name: z.string().trim().min(2, "Name must be at least 2 characters"),
   email: z.string().trim().toLowerCase().email("Invalid email address"),
+  registrationToken: z.string().min(1, "Verify your email before registering"),
   // max 72: bcrypt only uses the first 72 bytes anyway, and a huge password
   // would make the server waste time hashing it.
   password: z
@@ -23,6 +24,16 @@ const loginSchema = z.object({
 
 // Body of POST /api/auth/forgot-password
 const forgotPasswordSchema = z.object({
+  email: z.string().trim().toLowerCase().email("Invalid email address"),
+});
+
+// Body of POST /api/auth/verify-email
+const verifyEmailSchema = z.object({
+  email: z.string().trim().toLowerCase().email("Invalid email address"),
+  otp: z.string().regex(/^\d{6}$/, "OTP must be 6 digits"),
+});
+
+const registrationEmailSchema = z.object({
   email: z.string().trim().toLowerCase().email("Invalid email address"),
 });
 
@@ -61,6 +72,8 @@ module.exports = {
   registerSchema,
   loginSchema,
   forgotPasswordSchema,
+  verifyEmailSchema,
+  registrationEmailSchema,
   resetPasswordSchema,
   updateProfileSchema,
   changePasswordSchema,
