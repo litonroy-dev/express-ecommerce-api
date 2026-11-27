@@ -3,8 +3,18 @@ const Order = require("../models/Order");
 const { round2 } = require("./quantity");
 const { SHIPPING_FEE, FREE_SHIPPING_OVER } = require("../constants/order");
 
+// The part of the cart the coupon applies to.
+// No product list on the coupon = the whole cart. Otherwise only the listed products count.
+// "items" are cart/order lines: { product, lineTotal }.
+exports.getEligibleSubtotal = (coupon, items) => {
+  const allowed = new Set((coupon?.products ?? []).map((id) => id.toString()));
+  const eligible = allowed.size === 0 ? items : items.filter((i) => allowed.has(i.product.toString()));
+  return round2(eligible.reduce((sum, i) => sum + i.lineTotal, 0));
+};
+
 // Returns a message explaining why the coupon can't be used, or null if it CAN be used.
 // "coupon" may be null (code not found), so that case is handled here too.
+// "subtotal" is the ELIGIBLE subtotal (see getEligibleSubtotal).
 exports.getCouponError = async (coupon, subtotal, userId) => {
   const now = new Date();
 
@@ -17,6 +27,11 @@ exports.getCouponError = async (coupon, subtotal, userId) => {
 
   if (coupon.usageLimit != null && coupon.usageCount >= coupon.usageLimit) {
     return "This coupon has reached its usage limit";
+  }
+
+  // Coupon is limited to some products and none of them are in the cart
+  if (coupon.products?.length > 0 && subtotal <= 0) {
+    return "This coupon does not apply to the items in your cart";
   }
 
   if (subtotal < coupon.minOrderAmount) {

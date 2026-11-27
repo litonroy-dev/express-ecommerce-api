@@ -24,6 +24,9 @@ const couponSchema = new mongoose.Schema(
     // How many times ONE customer may use it
     perUserLimit: { type: Number, default: 1, min: 1 },
 
+    // Only these products get the discount. Empty = the coupon works on every product.
+    products: [{ type: mongoose.Schema.Types.ObjectId, ref: "Product" }],
+
     // Valid period. null = no start / no end.
     startsAt: { type: Date, default: null },
     expiresAt: { type: Date, default: null },

@@ -1,3 +1,5 @@
+const fs = require("fs/promises");
+const path = require("path");
 const Category = require("../models/Category");
 const Product = require("../models/Product");
 const {
@@ -6,6 +8,8 @@ const {
 } = require("../validators/category.validator");
 const sendValidationError = require("../utils/sendValidationError");
 const { slugify } = require("../utils/slug");
+const { removeFiles, hasImageSignature } = require("../utils/imageFile");
+const { CATEGORY_DIR, baseUrl } = require("../config/uploads");
 
 // GET /api/categories  (public)
 // Few categories exist, so no pagination is needed.
@@ -64,4 +68,62 @@ exports.deleteCategory = async (req, res) => {
 
   await category.deleteOne();
   res.json({ success: true, message: "Category deleted" });
+};
+
+// POST /api/categories/:id/image  (admin only)
+// Send multipart/form-data with field "image" (single file, JPG/PNG/WebP, max 2 MB).
+exports.uploadCategoryImage = async (req, res) => {
+  const file = req.file;
+
+  if (!file) {
+    return res.status(400).json({ success: false, message: 'No image received. Use the form field "image"' });
+  }
+
+  const category = await Category.findById(req.params.id);
+  if (!category) {
+    await removeFiles([file]);
+    return res.status(404).json({ success: false, message: "Category not found" });
+  }
+
+  // Verify real image signature (not just MIME type)
+  const isValid = await hasImageSignature(file.path);
+  if (!isValid) {
+    await removeFiles([file]);
+    return res.status(400).json({ success: false, message: "File is not a valid image" });
+  }
+
+  // Delete old image file from disk if it was one of ours
+  if (category.image) {
+    const oldFilename = category.image.split("/uploads/categories/")[1];
+    if (oldFilename && /^[a-f0-9]{32}\.(jpg|png|webp)$/.test(oldFilename)) {
+      await fs.unlink(path.join(CATEGORY_DIR, oldFilename)).catch(() => {});
+    }
+  }
+
+  category.image = `${baseUrl()}/uploads/categories/${file.filename}`;
+  await category.save();
+
+  res.json({ success: true, category });
+};
+
+// DELETE /api/categories/:id/image  (admin only)
+exports.deleteCategoryImage = async (req, res) => {
+  const category = await Category.findById(req.params.id);
+  if (!category) {
+    return res.status(404).json({ success: false, message: "Category not found" });
+  }
+
+  if (!category.image) {
+    return res.status(404).json({ success: false, message: "This category has no image" });
+  }
+
+  const filename = category.image.split("/uploads/categories/")[1];
+  if (filename && /^[a-f0-9]{32}\.(jpg|png|webp)$/.test(filename)) {
+    await fs.unlink(path.join(CATEGORY_DIR, filename)).catch(() => {});
+  }
+
+  category.image = undefined;
+  await category.save();
+
+  res.json({ success: true, category });
 };

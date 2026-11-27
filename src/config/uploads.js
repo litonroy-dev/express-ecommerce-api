@@ -1,12 +1,16 @@
 const path = require("path");
 const fs = require("fs");
 
-// Uploaded files are stored in <project>/uploads/products
+// Uploaded files are stored in <project>/uploads/products, /uploads/categories /uploads/products  &  /uploads/categories /uploads/banners
 exports.UPLOAD_ROOT = path.join(__dirname, "../../uploads");
 exports.PRODUCT_DIR = path.join(exports.UPLOAD_ROOT, "products");
+exports.CATEGORY_DIR = path.join(exports.UPLOAD_ROOT, "categories");
+exports.BANNER_DIR = path.join(exports.UPLOAD_ROOT, "banners");
 
 // Create the folders if they don't exist yet (recursive = create parents too)
 fs.mkdirSync(exports.PRODUCT_DIR, { recursive: true });
+fs.mkdirSync(exports.CATEGORY_DIR, { recursive: true });
+fs.mkdirSync(exports.BANNER_DIR, { recursive: true });
 
 // Limits, in one place
 exports.MAX_IMAGE_SIZE = 2 * 1024 * 1024; // 2 MB per image

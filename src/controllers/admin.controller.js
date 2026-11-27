@@ -245,3 +245,25 @@ exports.getOrder = async (req, res) => {
 
   res.json({ success: true, order });
 };
+
+// DELETE /api/admin/orders/:id
+exports.deleteOrder = async (req, res) => {
+  const order = await Order.findByIdAndDelete(req.params.id);
+  if (!order) return res.status(404).json({ success: false, message: "Order not found" });
+
+  res.json({ success: true, message: "Order deleted" });
+};
+
+// DELETE /api/admin/users/:id
+exports.deleteUser = async (req, res) => {
+  if (String(req.params.id) === String(req.user._id)) {
+    return res
+      .status(400)
+      .json({ success: false, message: "You can't delete your own account" });
+  }
+
+  const user = await User.findByIdAndDelete(req.params.id);
+  if (!user) return res.status(404).json({ success: false, message: "User not found" });
+
+  res.json({ success: true, message: "User deleted" });
+};

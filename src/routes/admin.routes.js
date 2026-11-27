@@ -5,8 +5,10 @@ const {
   listUsers,
   getUser,
   updateUser,
+  deleteUser,
   getProduct,
   getOrder,
+  deleteOrder,
 } = require("../controllers/admin.controller");
 const {
   listCoupons,
@@ -19,7 +21,9 @@ const {
   createBanner,
   updateBanner,
   deleteBanner,
+  uploadBannerImage,
 } = require("../controllers/banner.controller");
+const uploadBannerImageMiddleware = require("../middlewares/uploadBannerImage");
 const { protect, restrictTo } = require("../middlewares/auth");
 const validateObjectId = require("../middlewares/validateObjectId");
 
@@ -33,7 +37,9 @@ router.get("/products/:id", validateObjectId, getProduct);
 router.get("/users", listUsers);
 router.get("/users/:id", validateObjectId, getUser);
 router.patch("/users/:id", validateObjectId, updateUser);
+router.delete("/users/:id", validateObjectId, deleteUser);
 router.get("/orders/:id", validateObjectId, getOrder);
+router.delete("/orders/:id", validateObjectId, deleteOrder);
 
 router.get("/coupons", listCoupons);
 router.post("/coupons", createCoupon);
@@ -41,6 +47,7 @@ router.patch("/coupons/:id", validateObjectId, updateCoupon);
 router.delete("/coupons/:id", validateObjectId, deleteCoupon);
 
 router.get("/banners", listAllBanners);
+router.post("/banners/image", uploadBannerImageMiddleware, uploadBannerImage);
 router.post("/banners", createBanner);
 router.patch("/banners/:id", validateObjectId, updateBanner);
 router.delete("/banners/:id", validateObjectId, deleteBanner);

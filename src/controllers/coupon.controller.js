@@ -10,7 +10,7 @@ const {
 const sendValidationError = require("../utils/sendValidationError");
 const { isVisibleToCustomers } = require("../utils/productVisibility");
 const { round2 } = require("../utils/quantity");
-const { getCouponError, calculateDiscount, calculateTotals } = require("../utils/coupon");
+const { getCouponError, getEligibleSubtotal, calculateDiscount, calculateTotals } = require("../utils/coupon");
 
 // Rules that involve several fields, so they are checked on the FINAL coupon
 // (after an update is applied). Returns an error message or null.
@@ -42,19 +42,23 @@ exports.validateCoupon = async (req, res) => {
   const products = await Product.find({ _id: { $in: cart.items.map((i) => i.product) } });
   const productById = new Map(products.map((p) => [p._id.toString(), p]));
 
-  // Add up the items that can still be bought
-  let subtotal = 0;
+  // The items that can still be bought
+  const lines = [];
   for (const item of cart.items) {
     const product = productById.get(item.product.toString());
-    if (product && isVisibleToCustomers(product)) subtotal += product.price * item.quantity;
+    if (product && isVisibleToCustomers(product)) {
+      lines.push({ product: product._id, lineTotal: round2(product.price * item.quantity) });
+    }
   }
-  subtotal = round2(subtotal);
+  const subtotal = round2(lines.reduce((sum, l) => sum + l.lineTotal, 0));
 
   const coupon = await Coupon.findOne({ code: result.data.code });
-  const problem = await getCouponError(coupon, subtotal, req.user._id);
+  // If the coupon is limited to some products, only those items count
+  const eligibleSubtotal = getEligibleSubtotal(coupon, lines);
+  const problem = await getCouponError(coupon, eligibleSubtotal, req.user._id);
   if (problem) return res.status(400).json({ success: false, message: problem });
 
-  const discount = calculateDiscount(coupon, subtotal);
+  const discount = calculateDiscount(coupon, eligibleSubtotal);
 
   res.json({
     success: true,
@@ -63,6 +67,7 @@ exports.validateCoupon = async (req, res) => {
       description: coupon.description,
       type: coupon.type,
       value: coupon.value,
+      appliesToAllProducts: coupon.products.length === 0,
     },
     ...calculateTotals(subtotal, discount), // subtotal, discount, shippingFee, total
   });
@@ -81,6 +86,7 @@ exports.listCoupons = async (req, res) => {
 
   const [coupons, total] = await Promise.all([
     Coupon.find(filter)
+      .populate("products", "name")
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(limit),
@@ -106,6 +112,7 @@ exports.createCoupon = async (req, res) => {
 
   // Same code twice -> MongoDB error 11000 -> 409 "code already exists" (see app.js)
   await coupon.save();
+  await coupon.populate("products", "name");
   res.status(201).json({ success: true, coupon });
 };
 
@@ -125,6 +132,7 @@ exports.updateCoupon = async (req, res) => {
   if (problem) return res.status(400).json({ success: false, message: problem });
 
   await coupon.save();
+  await coupon.populate("products", "name");
   res.json({ success: true, coupon });
 };
 

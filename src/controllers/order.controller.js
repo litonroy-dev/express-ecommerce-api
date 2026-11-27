@@ -16,6 +16,7 @@ const { round2, quantityError } = require("../utils/quantity");
 const { STATUS_FLOW, CUSTOMER_CANCELLABLE, SHIPPING_FEE, FREE_SHIPPING_OVER } = require("../constants/order");
 const {
   getCouponError,
+  getEligibleSubtotal,
   calculateDiscount,
   calculateTotals,
   releaseCoupon,
@@ -117,11 +118,13 @@ exports.createOrder = async (req, res) => {
   let discount = 0;
   if (result.data.couponCode) {
     coupon = await Coupon.findOne({ code: result.data.couponCode });
-    const couponProblem = await getCouponError(coupon, subtotal, req.user._id);
+    // If the coupon is limited to some products, only those items count
+    const eligibleSubtotal = getEligibleSubtotal(coupon, orderItems);
+    const couponProblem = await getCouponError(coupon, eligibleSubtotal, req.user._id);
     if (couponProblem) {
       return res.status(400).json({ success: false, message: couponProblem });
     }
-    discount = calculateDiscount(coupon, subtotal);
+    discount = calculateDiscount(coupon, eligibleSubtotal);
   }
 
   // subtotal - discount + shipping fee (the same math as the coupon preview)
@@ -249,8 +252,9 @@ exports.previewOrder = async (req, res) => {
   let couponError = null;
   if (result.data.couponCode) {
     const coupon = await Coupon.findOne({ code: result.data.couponCode });
-    couponError = await getCouponError(coupon, subtotal, req.user._id);
-    if (!couponError) discount = calculateDiscount(coupon, subtotal);
+    const eligibleSubtotal = getEligibleSubtotal(coupon, items);
+    couponError = await getCouponError(coupon, eligibleSubtotal, req.user._id);
+    if (!couponError) discount = calculateDiscount(coupon, eligibleSubtotal);
   }
 
   const totals = calculateTotals(subtotal, discount);

@@ -17,8 +17,14 @@ const couponFields = z.object({
   minOrderAmount: z.number().min(0).optional(),
   usageLimit: z.number().int().positive().nullable().optional(),
   perUserLimit: z.number().int().positive().optional(),
-  startsAt: z.coerce.date().optional(), // accepts "2026-12-01"
-  expiresAt: z.coerce.date().optional(),
+  // Product ids this coupon is limited to. [] (or leave out) = all products.
+  products: z
+    .array(z.string().regex(/^[a-f0-9]{24}$/i, "Invalid product id"))
+    .max(200, "Too many products")
+    .optional(),
+  // accepts "2026-12-01" or an ISO date; null = clear it (no start / no end)
+  startsAt: z.union([z.null(), z.coerce.date()]).optional(),
+  expiresAt: z.union([z.null(), z.coerce.date()]).optional(),
   isActive: z.boolean().optional(),
 });
 
