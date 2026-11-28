@@ -56,10 +56,15 @@ exports.register = async (req, res) => {
   });
   await RegistrationOtp.deleteOne({ _id: proof._id, registrationTokenHash: proofHash });
 
-  // Step 4: respond WITHOUT the password
+  // Step 4: auto-login — set the same httpOnly JWT cookie that /login sets
+  const token = signToken(user._id);
+  res.cookie("token", token, cookieOptions);
+
+  // Step 5: respond WITHOUT the password
   res.status(201).json({
     success: true,
-    message: "Registered successfully. You can now log in.",
+    message: "Registered successfully.",
+    token,
     user: publicUser(user),
   });
 };
@@ -80,7 +85,7 @@ exports.sendRegistrationOtp = async (req, res) => {
       $set: {
         email,
         otpHash: hashToken(otp),
-        otpExpiresAt: new Date(Date.now() + 10 * 60 * 1000),
+        otpExpiresAt: new Date(Date.now() + 3 * 60 * 1000),
         attempts: 0,
       },
       $unset: { registrationTokenHash: 1, registrationTokenExpiresAt: 1 },
@@ -90,7 +95,7 @@ exports.sendRegistrationOtp = async (req, res) => {
   await sendEmail({
     to: email,
     subject: "Your registration verification code",
-    text: `Your email verification code is: ${otp}\nIt expires in 10 minutes.`,
+    text: `Your email verification code is: ${otp}\nIt expires in 3 minutes.`,
   });
   res.json({ success: true, message: "Verification code sent to your email" });
 };
